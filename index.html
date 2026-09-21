@@ -257,14 +257,14 @@
 </div>
 
 <h1>🛡 보안 감시 시스템</h1>
-<div class="status-sub">"감시 시작"을 누르면 6초 후 무장됩니다. 그 전에 카메라 권한을 먼저 허용해두세요.</div>
+<div class="status-sub">"이 컴퓨터를 건드리면 벌을 받을 것이다.</div>
 
 <div class="status-card" id="statusCard">
   <div>
     <span class="dot" id="statusDot"></span>
     <span class="status-text" id="statusText">감시 꺼짐 (대기 중)</span>
   </div>
-  <div class="big-msg" id="bigMsg">🚨 침입 감지! 사진 촬영됨</div>
+  <div class="big-msg" id="bigMsg">🚨 침입 감지! 사진 촬영됨. 신원 분석 중...</div>
   <div class="audio-wait" id="audioWait">🔇 오디오 자동재생 제한으로 소리 대기 중 (클릭/키입력 시 재생됨)</div>
   <button class="btn start" id="armToggleBtn">🟢 감시 시작</button>
 </div>
@@ -273,20 +273,17 @@
 <div class="cam-ok" id="camOk">✅ 카메라 연결됨 — 촬영 준비 완료</div>
 
 <div class="cam-note">
-  카메라 권한을 허용해야 침입자 사진이 촬영됩니다. <b>파일을 더블클릭해서 열면 카메라/알림이 차단될 수 있어요</b> — 로컬 서버(예: <code>python3 -m http.server</code>)로 열어주세요.<br>
-  🔔 알림을 허용하면 다른 창에 있어도(Alt+Tab 등) 알림으로 확인할 수 있고, 📷 미리보기로 카메라가 얼굴을 잘 잡는지 지금 확인할 수 있어요 (감시 중엔 꺼두는 걸 권장).
+이 컴퓨터를 건드리면 신원이 다 털릴거임 ㅋ
 </div>
 
 <div class="limits">
-  ⚠️ 웹페이지는 Alt+Tab을 막을 수 없고(OS 영역), 최신 브라우저는 Ctrl+W/Ctrl+Tab의 강제 차단도 허용하지 않습니다. 이 도구는 "차단"이 아니라 <b>시도 즉시 촬영·경보·기록</b>으로 대응합니다. 자리를 오래 비울 땐 OS 화면 잠금(Windows: Win+L, Mac: Cmd+Ctrl+Q)을 함께 쓰세요.
-</div>
-
+  내가 우회는 다 막음. ㅋ
 <video id="video" autoplay playsinline muted></video>
 <canvas id="canvas" style="display:none;"></canvas>
 
 <div id="camPreviewWrap">
   <video id="camPreview" autoplay playsinline muted></video>
-  <span>카메라 확인용 (감시 중엔 숨김 권장)</span>
+  <span>카메라 막아도 신원 특정 ㄱㄴ</span>
 </div>
 
 <div id="overlay">
