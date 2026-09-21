@@ -43,18 +43,23 @@
     box-shadow: 0 0 30px rgba(255,59,59,0.5);
     animation: pulse 0.6s infinite alternate;
   }
+  .status-card.counting {
+    border-color: #f5c542;
+    box-shadow: 0 0 20px rgba(245,197,66,0.4);
+  }
   @keyframes pulse {
     from { box-shadow: 0 0 15px rgba(255,59,59,0.35); }
     to   { box-shadow: 0 0 45px rgba(255,59,59,0.85); }
   }
   .dot {
     width: 14px; height: 14px; border-radius: 50%;
-    background: var(--accent2);
+    background: var(--muted);
     display: inline-block;
     margin-right: 8px;
-    box-shadow: 0 0 8px var(--accent2);
   }
+  .dot.armed { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
   .dot.alarm { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .dot.counting { background: #f5c542; box-shadow: 0 0 8px #f5c542; }
   .status-text { font-size: 17px; font-weight: 600; }
   .big-msg {
     margin-top: 14px;
@@ -83,7 +88,7 @@
     cursor: pointer;
   }
   .btn:hover { background: #223042; }
-  .btn.danger { border-color: var(--accent); color: var(--accent); }
+  .btn.start { border-color: var(--accent2); color: var(--accent2); font-weight: 700; }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .cam-note {
@@ -104,6 +109,15 @@
     display: none;
   }
   .cam-error.show { display: block; }
+  .cam-ok {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--accent2);
+    max-width: 480px;
+    text-align: center;
+    display: none;
+  }
+  .cam-ok.show { display: block; }
 
   .top-buttons {
     position: fixed;
@@ -243,36 +257,36 @@
 </div>
 
 <h1>🛡 보안 감시 시스템</h1>
-<div class="status-sub">마우스 클릭 · 스크롤 · 이동 · 키보드 입력 · 화면 이탈을 감지합니다</div>
+<div class="status-sub">"감시 시작"을 누르면 6초 후 무장됩니다. 그 전에 카메라 권한을 먼저 허용해두세요.</div>
 
 <div class="status-card" id="statusCard">
   <div>
     <span class="dot" id="statusDot"></span>
-    <span class="status-text" id="statusText">감시중 (이상 없음)</span>
+    <span class="status-text" id="statusText">감시 꺼짐 (대기 중)</span>
   </div>
   <div class="big-msg" id="bigMsg">🚨 침입 감지! 사진 촬영됨</div>
   <div class="audio-wait" id="audioWait">🔇 오디오 자동재생 제한으로 소리 대기 중 (클릭/키입력 시 재생됨)</div>
-  <button class="btn" id="armToggleBtn">감시 끄기 (비밀번호 필요)</button>
+  <button class="btn start" id="armToggleBtn">🟢 감시 시작</button>
 </div>
 
-<div class="cam-error" id="camError">⚠️ 카메라 접근이 거부되었습니다. 사진 촬영 없이 사이렌만 작동합니다. 브라우저 주소창 옆 카메라 권한을 확인해주세요.</div>
+<div class="cam-error" id="camError">⚠️ 카메라 접근 실패</div>
+<div class="cam-ok" id="camOk">✅ 카메라 연결됨 — 촬영 준비 완료</div>
 
 <div class="cam-note">
   카메라 권한을 허용해야 침입자 사진이 촬영됩니다. <b>파일을 더블클릭해서 열면 카메라/알림이 차단될 수 있어요</b> — 로컬 서버(예: <code>python3 -m http.server</code>)로 열어주세요.<br>
-  🔔 알림을 허용하면 다른 창에 있어도(Alt+Tab 등) 알림으로 확인할 수 있고, 📷 미리보기로 카메라가 얼굴을 잘 잡는지 설정 단계에서 확인할 수 있어요 (평소엔 꺼두는 걸 권장).
+  🔔 알림을 허용하면 다른 창에 있어도(Alt+Tab 등) 알림으로 확인할 수 있고, 📷 미리보기로 카메라가 얼굴을 잘 잡는지 지금 확인할 수 있어요 (감시 중엔 꺼두는 걸 권장).
 </div>
 
 <div class="limits">
   ⚠️ 웹페이지는 Alt+Tab을 막을 수 없고(OS 영역), 최신 브라우저는 Ctrl+W/Ctrl+Tab의 강제 차단도 허용하지 않습니다. 이 도구는 "차단"이 아니라 <b>시도 즉시 촬영·경보·기록</b>으로 대응합니다. 자리를 오래 비울 땐 OS 화면 잠금(Windows: Win+L, Mac: Cmd+Ctrl+Q)을 함께 쓰세요.
 </div>
 
-<video id="video" autoplay playsinline muted style="display:none;"></video>
-<video id="camPreviewVideoProxy" style="display:none;"></video>
+<video id="video" autoplay playsinline muted></video>
 <canvas id="canvas" style="display:none;"></canvas>
 
 <div id="camPreviewWrap">
   <video id="camPreview" autoplay playsinline muted></video>
-  <span>카메라 확인용 (평소엔 숨김 권장)</span>
+  <span>카메라 확인용 (감시 중엔 숨김 권장)</span>
 </div>
 
 <div id="overlay">
@@ -304,12 +318,17 @@
   const ADMIN_PASSWORD_HASH = "ed053874ca199cc53e11c9f4aeaeccd07da652d1c19e3cbdbad5fd9fadba2532"; // sha256("1125")
   const MAX_SHOTS = 40;
   const CAPTURE_COOLDOWN_MS = 3000;
-  const CAPTURE_MAX_WIDTH = 480; // 저장 용량 절약을 위해 축소 촬영
+  const CAPTURE_MAX_WIDTH = 480;
   const MAX_FAILED_ATTEMPTS = 5;
   const LOCKOUT_MS = 20000;
+  const ARM_COUNTDOWN_SEC = 6;
+  const BLUR_DEBOUNCE_MS = 500; // 권한 팝업 클릭 시 생기는 순간적 blur 오탐 방지
   const ORIGINAL_TITLE = document.title;
 
-  let armed = true;
+  let armed = false;
+  let arming = false; // 카운트다운 중
+  let armTimer = null;
+  let armCountdown = ARM_COUNTDOWN_SEC;
   let alarming = false;
   let lastCaptureTime = 0;
   let audioCtx = null;
@@ -317,9 +336,9 @@
   let sirenGain = null;
   let sirenInterval = null;
   let titleBlinkInterval = null;
+  let blurTimer = null;
   let shots = [];
   let cameraReady = false;
-  let cameraStream = null;
   let notifPermission = (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported';
   let failedAttempts = 0;
   let lockUntil = 0;
@@ -335,6 +354,7 @@
   const camPreviewWrap = document.getElementById('camPreviewWrap');
   const previewToggle = document.getElementById('previewToggle');
   const camError = document.getElementById('camError');
+  const camOk = document.getElementById('camOk');
   const canvas = document.getElementById('canvas');
   const adminToggle = document.getElementById('adminToggle');
   const notifyBadge = document.getElementById('notifyBadge');
@@ -350,6 +370,14 @@
   const gallery = document.getElementById('gallery');
   const emptyNote = document.getElementById('emptyNote');
 
+  // 캡처용 video는 "화면 밖으로 이동" 방식으로 숨김 (display:none은 일부 브라우저에서
+  // 프레임 갱신이 멈춰 사진이 계속 빈 값이 되는 문제가 있었음)
+  video.style.position = 'fixed';
+  video.style.top = '-9999px';
+  video.style.left = '-9999px';
+  video.style.width = '2px';
+  video.style.height = '2px';
+
   try {
     const saved = localStorage.getItem('intruder_shots');
     if (saved) shots = JSON.parse(saved);
@@ -359,24 +387,26 @@
     try {
       localStorage.setItem('intruder_shots', JSON.stringify(shots.slice(0, MAX_SHOTS)));
     } catch (e) {
-      // 용량 초과 시: 오래된 절반을 지우고 재시도
       try {
         shots = shots.slice(0, Math.floor(shots.length / 2));
         localStorage.setItem('intruder_shots', JSON.stringify(shots));
-      } catch (e2) { /* 그래도 실패하면 포기 (메모리 상에는 남아있음) */ }
+      } catch (e2) { /* 그래도 실패하면 메모리 상에만 유지 */ }
     }
   }
 
   navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     .then(stream => {
-      cameraStream = stream;
       video.srcObject = stream;
       camPreview.srcObject = stream;
       cameraReady = true;
       camError.classList.remove('show');
+      camOk.classList.add('show');
     })
     .catch(err => {
       console.warn('카메라 접근 실패:', err);
+      camOk.classList.remove('show');
+      camError.textContent = '⚠️ 카메라 접근 실패: ' + (err && (err.name || err.message) || '알 수 없는 오류') +
+        '. 주소창의 카메라 권한 아이콘을 확인하거나, file://로 열었다면 로컬 서버로 다시 열어보세요.';
       camError.classList.add('show');
     });
 
@@ -396,7 +426,6 @@
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
-  // ---- 사이렌 ----
   function startSiren() {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
@@ -425,8 +454,6 @@
   }
 
   function tryResumeAudio() {
-    // 자동재생 정책 때문에 mousemove 등으로는 재생이 안 될 수 있어
-    // 매번 진짜 사용자 이벤트가 들어올 때마다 재개를 시도한다.
     if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume().catch(() => {});
     }
@@ -462,7 +489,6 @@
     document.title = ORIGINAL_TITLE;
   }
 
-  // ---- 데스크톱 알림 ----
   function updateNotifyBadge() {
     if (notifPermission === 'granted') {
       notifyBadge.textContent = '🔔 알림 켜짐';
@@ -486,19 +512,24 @@
   notifyBadge.addEventListener('click', requestNotifyPermission);
   updateNotifyBadge();
 
-  // ---- 카메라 미리보기 토글 (설정 확인용, 평소엔 꺼둠) ----
   previewToggle.addEventListener('click', () => {
     camPreviewWrap.classList.toggle('show');
     previewToggle.classList.toggle('on');
   });
 
   function renderStatus() {
-    if (!armed) {
-      statusCard.classList.remove('alarm');
-      statusDot.classList.remove('alarm');
-      statusText.textContent = '감시 꺼짐';
+    statusCard.classList.remove('alarm', 'counting');
+    statusDot.classList.remove('alarm', 'armed', 'counting');
+    if (arming) {
+      statusCard.classList.add('counting');
+      statusDot.classList.add('counting');
+      statusText.textContent = armCountdown + '초 후 감시 시작... (버튼 다시 누르면 취소)';
       bigMsg.classList.remove('show');
-      armToggleBtn.textContent = '감시 켜기';
+      armToggleBtn.textContent = '⏸ 시작 취소';
+    } else if (!armed) {
+      statusText.textContent = '감시 꺼짐 (대기 중)';
+      bigMsg.classList.remove('show');
+      armToggleBtn.textContent = '🟢 감시 시작';
     } else if (alarming) {
       statusCard.classList.add('alarm');
       statusDot.classList.add('alarm');
@@ -506,8 +537,7 @@
       bigMsg.classList.add('show');
       armToggleBtn.textContent = '감시 끄기 (비밀번호 필요)';
     } else {
-      statusCard.classList.remove('alarm');
-      statusDot.classList.remove('alarm');
+      statusDot.classList.add('armed');
       statusText.textContent = '감시중 (이상 없음)';
       bigMsg.classList.remove('show');
       armToggleBtn.textContent = '감시 끄기 (비밀번호 필요)';
@@ -516,7 +546,7 @@
   }
 
   function addShot(dataUrl, tag) {
-    if (!dataUrl) return; // 카메라 준비 안 됐을 때 빈 사진 저장 방지
+    if (!dataUrl) return;
     shots.unshift({ img: dataUrl, time: new Date().toLocaleString('ko-KR'), tag: tag || '감지' });
     if (shots.length > MAX_SHOTS) shots.length = MAX_SHOTS;
     saveShots();
@@ -540,7 +570,8 @@
 
   function isInsideAdminUI(target) {
     return overlay.contains(target) || adminToggle.contains(target) ||
-           notifyBadge.contains(target) || previewToggle.contains(target);
+           notifyBadge.contains(target) || previewToggle.contains(target) ||
+           armToggleBtn.contains(target);
   }
 
   ['mousemove', 'mousedown', 'click', 'wheel'].forEach(evt => {
@@ -555,12 +586,21 @@
   }, { passive: true });
   window.addEventListener('keydown', (e) => {
     if (isInsideAdminUI(e.target)) return;
+    if (e.key === 'Escape' && overlay.classList.contains('show')) return;
     triggerIntrusion('키보드');
   }, { passive: true });
 
+  // ---- 화면 이탈 감지: 디바운스로 권한 팝업 클릭 시 생기는 순간적 blur는 무시 ----
   window.addEventListener('blur', () => {
     if (!armed) return;
-    triggerIntrusion('화면 이탈(Alt+Tab 등)');
+    if (blurTimer) clearTimeout(blurTimer);
+    blurTimer = setTimeout(() => {
+      triggerIntrusion('화면 이탈(Alt+Tab 등)');
+      blurTimer = null;
+    }, BLUR_DEBOUNCE_MS);
+  });
+  window.addEventListener('focus', () => {
+    if (blurTimer) { clearTimeout(blurTimer); blurTimer = null; }
   });
   document.addEventListener('visibilitychange', () => {
     if (!armed) return;
@@ -569,7 +609,7 @@
 
   window.addEventListener('beforeunload', (e) => {
     if (!armed) return;
-    addShot(capturePhoto(), '탭 닫기 시도'); // capturePhoto가 null이면 addShot이 무시함
+    addShot(capturePhoto(), '탭 닫기 시도');
     e.preventDefault();
     e.returnValue = '';
   });
@@ -579,13 +619,39 @@
     e.preventDefault();
   });
 
-  // ---- 감시 켜기/끄기: 끄는 것은 반드시 비밀번호 필요 ----
+  // ---- 감시 시작(카운트다운)/끄기(비밀번호 필요) ----
+  function cancelArming() {
+    if (armTimer) { clearInterval(armTimer); armTimer = null; }
+    arming = false;
+    armCountdown = ARM_COUNTDOWN_SEC;
+    renderStatus();
+  }
+
+  function beginArmingCountdown() {
+    arming = true;
+    armCountdown = ARM_COUNTDOWN_SEC;
+    renderStatus();
+    armTimer = setInterval(() => {
+      armCountdown--;
+      if (armCountdown <= 0) {
+        clearInterval(armTimer);
+        armTimer = null;
+        arming = false;
+        armed = true;
+        renderStatus();
+      } else {
+        renderStatus();
+      }
+    }, 1000);
+  }
+
   armToggleBtn.addEventListener('click', () => {
-    if (!armed) {
-      armed = true;
-      renderStatus();
+    if (arming) {
+      cancelArming();
+    } else if (!armed) {
+      beginArmingCountdown();
     } else {
-      openAdminOverlay(); // 비밀번호 확인 후에만 실제로 꺼짐 (unlockAdmin에서 처리)
+      openAdminOverlay(); // 끄는 것은 비밀번호 확인 후 unlockAdmin에서 처리
     }
   });
 
@@ -642,7 +708,8 @@
 
   function unlockAdmin() {
     alarming = false;
-    armed = false; // 재무장 루프 방지: 관리자 인증 성공 시 감시를 확실히 끔 (다시 켤 땐 버튼으로)
+    armed = false;
+    cancelArming();
     stopSiren();
     renderStatus();
     failedAttempts = 0;
