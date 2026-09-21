@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>보안 감시 시스템</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #131a22;
+    --accent: #ff3b3b;
+    --accent2: #2ecc71;
+    --text: #e6edf3;
+    --muted: #8a97a3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 60px;
+  }
+  h1 { font-size: 20px; margin: 8px 0 4px; }
+  .status-sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; text-align:center; }
+
+  .status-card {
+    width: 100%;
+    max-width: 480px;
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 28px 20px;
+    text-align: center;
+    border: 1px solid #1f2933;
+    transition: box-shadow .2s, border-color .2s;
+  }
+  .status-card.alarm {
+    border-color: var(--accent);
+    box-shadow: 0 0 30px rgba(255,59,59,0.5);
+    animation: pulse 0.6s infinite alternate;
+  }
+  @keyframes pulse {
+    from { box-shadow: 0 0 15px rgba(255,59,59,0.35); }
+    to   { box-shadow: 0 0 45px rgba(255,59,59,0.85); }
+  }
+  .dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent2);
+    display: inline-block;
+    margin-right: 8px;
+    box-shadow: 0 0 8px var(--accent2);
+  }
+  .dot.alarm { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .status-text { font-size: 17px; font-weight: 600; }
+  .big-msg {
+    margin-top: 14px;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent);
+    display: none;
+  }
+  .big-msg.show { display: block; }
+  .audio-wait {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #f5c542;
+    display: none;
+  }
+  .audio-wait.show { display: block; }
+
+  .btn {
+    margin-top: 20px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: 1px solid #2a3644;
+    background: #1a2330;
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .btn:hover { background: #223042; }
+  .btn.danger { border-color: var(--accent); color: var(--accent); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .cam-note {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    max-width: 480px;
+    text-align: center;
+    line-height: 1.6;
+  }
+  .cam-note b { color: #cbd5e0; }
+  .cam-error {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--accent);
+    max-width: 480px;
+    text-align: center;
+    display: none;
+  }
+  .cam-error.show { display: block; }
+
+  .top-buttons {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    right: 14px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    z-index: 50;
+    pointer-events: none;
+  }
+  .top-buttons .btn-group { display: flex; gap: 8px; pointer-events: auto; }
+  .mini-btn {
+    background: #1a2330;
+    border: 1px solid #2a3644;
+    color: var(--muted);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .mini-btn.on { color: var(--accent2); border-color: var(--accent2); }
+
+  #camPreviewWrap {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    z-index: 40;
+  }
+  #camPreviewWrap.show { display: flex; }
+  #camPreviewWrap span {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  #camPreview {
+    width: 140px;
+    border-radius: 8px;
+    border: 1px solid #2a3644;
+  }
+
+  #overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  #overlay.show { display: flex; }
+  #adminPanel {
+    background: var(--panel);
+    border-radius: 16px;
+    border: 1px solid #1f2933;
+    padding: 24px;
+    width: 100%;
+    max-width: 520px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  #adminPanel h2 { margin-top: 0; font-size: 18px; }
+  #pwInput {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #2a3644;
+    background: #0f151c;
+    color: var(--text);
+    font-size: 16px;
+    letter-spacing: 4px;
+    text-align: center;
+    margin-top: 10px;
+  }
+  #pwError {
+    color: var(--accent);
+    font-size: 13px;
+    margin-top: 8px;
+    min-height: 18px;
+  }
+  .row { display: flex; gap: 10px; margin-top: 14px; }
+  .row .btn { flex: 1; margin-top: 0; }
+
+  #gallery {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+  #gallery figure { margin: 0; }
+  #gallery img {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #2a3644;
+    display: block;
+  }
+  .shot-time {
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+  .shot-tag {
+    display: inline-block;
+    margin-top: 2px;
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: #21303f;
+    color: #9db2c7;
+  }
+  .shot-dl {
+    display: block;
+    margin-top: 3px;
+    font-size: 10px;
+    color: #6fb3ff;
+    text-decoration: none;
+  }
+  .empty-note { color: var(--muted); font-size: 13px; margin-top: 14px; }
+  .limits { font-size: 11px; color: var(--muted); margin-top: 18px; line-height: 1.6; border-top: 1px solid #223042; padding-top: 12px; }
+</style>
+</head>
+<body>
+
+<div class="top-buttons">
+  <div class="btn-group">
+    <button class="mini-btn" id="notifyBadge">🔔 알림 끔</button>
+    <button class="mini-btn" id="previewToggle">📷 미리보기</button>
+  </div>
+  <div class="btn-group">
+    <button class="mini-btn" id="adminToggle">🔒 관리자</button>
+  </div>
+</div>
+
+<h1>🛡 보안 감시 시스템</h1>
+<div class="status-sub">마우스 클릭 · 스크롤 · 이동 · 키보드 입력 · 화면 이탈을 감지합니다</div>
+
+<div class="status-card" id="statusCard">
+  <div>
+    <span class="dot" id="statusDot"></span>
+    <span class="status-text" id="statusText">감시중 (이상 없음)</span>
+  </div>
+  <div class="big-msg" id="bigMsg">🚨 침입 감지! 사진 촬영됨</div>
+  <div class="audio-wait" id="audioWait">🔇 오디오 자동재생 제한으로 소리 대기 중 (클릭/키입력 시 재생됨)</div>
+  <button class="btn" id="armToggleBtn">감시 끄기 (비밀번호 필요)</button>
+</div>
+
+<div class="cam-error" id="camError">⚠️ 카메라 접근이 거부되었습니다. 사진 촬영 없이 사이렌만 작동합니다. 브라우저 주소창 옆 카메라 권한을 확인해주세요.</div>
+
+<div class="cam-note">
+  카메라 권한을 허용해야 침입자 사진이 촬영됩니다. <b>파일을 더블클릭해서 열면 카메라/알림이 차단될 수 있어요</b> — 로컬 서버(예: <code>python3 -m http.server</code>)로 열어주세요.<br>
+  🔔 알림을 허용하면 다른 창에 있어도(Alt+Tab 등) 알림으로 확인할 수 있고, 📷 미리보기로 카메라가 얼굴을 잘 잡는지 설정 단계에서 확인할 수 있어요 (평소엔 꺼두는 걸 권장).
+</div>
+
+<div class="limits">
+  ⚠️ 웹페이지는 Alt+Tab을 막을 수 없고(OS 영역), 최신 브라우저는 Ctrl+W/Ctrl+Tab의 강제 차단도 허용하지 않습니다. 이 도구는 "차단"이 아니라 <b>시도 즉시 촬영·경보·기록</b>으로 대응합니다. 자리를 오래 비울 땐 OS 화면 잠금(Windows: Win+L, Mac: Cmd+Ctrl+Q)을 함께 쓰세요.
+</div>
+
+<video id="video" autoplay playsinline muted style="display:none;"></video>
+<video id="camPreviewVideoProxy" style="display:none;"></video>
+<canvas id="canvas" style="display:none;"></canvas>
+
+<div id="camPreviewWrap">
+  <video id="camPreview" autoplay playsinline muted></video>
+  <span>카메라 확인용 (평소엔 숨김 권장)</span>
+</div>
+
+<div id="overlay">
+  <div id="adminPanel">
+    <div id="loginView">
+      <h2>🔑 관리자 비밀번호</h2>
+      <input type="password" id="pwInput" maxlength="8" placeholder="••••" inputmode="numeric">
+      <div id="pwError"></div>
+      <div class="row">
+        <button class="btn" id="pwSubmit">확인</button>
+        <button class="btn" id="pwCancel">취소</button>
+      </div>
+    </div>
+
+    <div id="galleryView" style="display:none;">
+      <h2>📸 촬영된 침입자 사진</h2>
+      <div class="row">
+        <button class="btn" id="clearShotsBtn">전체 삭제</button>
+        <button class="btn" id="closeAdminBtn">닫기</button>
+      </div>
+      <div id="gallery"></div>
+      <div class="empty-note" id="emptyNote" style="display:none;">촬영된 사진이 없습니다.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const ADMIN_PASSWORD_HASH = "ed053874ca199cc53e11c9f4aeaeccd07da652d1c19e3cbdbad5fd9fadba2532"; // sha256("1125")
+  const MAX_SHOTS = 40;
+  const CAPTURE_COOLDOWN_MS = 3000;
+  const CAPTURE_MAX_WIDTH = 480; // 저장 용량 절약을 위해 축소 촬영
+  const MAX_FAILED_ATTEMPTS = 5;
+  const LOCKOUT_MS = 20000;
+  const ORIGINAL_TITLE = document.title;
+
+  let armed = true;
+  let alarming = false;
+  let lastCaptureTime = 0;
+  let audioCtx = null;
+  let sirenOsc = null;
+  let sirenGain = null;
+  let sirenInterval = null;
+  let titleBlinkInterval = null;
+  let shots = [];
+  let cameraReady = false;
+  let cameraStream = null;
+  let notifPermission = (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported';
+  let failedAttempts = 0;
+  let lockUntil = 0;
+
+  const statusCard = document.getElementById('statusCard');
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  const bigMsg = document.getElementById('bigMsg');
+  const audioWait = document.getElementById('audioWait');
+  const armToggleBtn = document.getElementById('armToggleBtn');
+  const video = document.getElementById('video');
+  const camPreview = document.getElementById('camPreview');
+  const camPreviewWrap = document.getElementById('camPreviewWrap');
+  const previewToggle = document.getElementById('previewToggle');
+  const camError = document.getElementById('camError');
+  const canvas = document.getElementById('canvas');
+  const adminToggle = document.getElementById('adminToggle');
+  const notifyBadge = document.getElementById('notifyBadge');
+  const overlay = document.getElementById('overlay');
+  const loginView = document.getElementById('loginView');
+  const galleryView = document.getElementById('galleryView');
+  const pwInput = document.getElementById('pwInput');
+  const pwError = document.getElementById('pwError');
+  const pwSubmit = document.getElementById('pwSubmit');
+  const pwCancel = document.getElementById('pwCancel');
+  const closeAdminBtn = document.getElementById('closeAdminBtn');
+  const clearShotsBtn = document.getElementById('clearShotsBtn');
+  const gallery = document.getElementById('gallery');
+  const emptyNote = document.getElementById('emptyNote');
+
+  try {
+    const saved = localStorage.getItem('intruder_shots');
+    if (saved) shots = JSON.parse(saved);
+  } catch (e) { shots = []; }
+
+  function saveShots() {
+    try {
+      localStorage.setItem('intruder_shots', JSON.stringify(shots.slice(0, MAX_SHOTS)));
+    } catch (e) {
+      // 용량 초과 시: 오래된 절반을 지우고 재시도
+      try {
+        shots = shots.slice(0, Math.floor(shots.length / 2));
+        localStorage.setItem('intruder_shots', JSON.stringify(shots));
+      } catch (e2) { /* 그래도 실패하면 포기 (메모리 상에는 남아있음) */ }
+    }
+  }
+
+  navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    .then(stream => {
+      cameraStream = stream;
+      video.srcObject = stream;
+      camPreview.srcObject = stream;
+      cameraReady = true;
+      camError.classList.remove('show');
+    })
+    .catch(err => {
+      console.warn('카메라 접근 실패:', err);
+      camError.classList.add('show');
+    });
+
+  function capturePhoto() {
+    if (!cameraReady || !video.videoWidth) return null;
+    const scale = Math.min(1, CAPTURE_MAX_WIDTH / video.videoWidth);
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.6);
+  }
+
+  async function sha256Hex(str) {
+    const enc = new TextEncoder().encode(str);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // ---- 사이렌 ----
+  function startSiren() {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    if (sirenInterval) { updateAudioWaitUI(); return; }
+
+    sirenGain = audioCtx.createGain();
+    sirenGain.gain.value = 0.35;
+    sirenGain.connect(audioCtx.destination);
+
+    sirenOsc = audioCtx.createOscillator();
+    sirenOsc.type = 'sawtooth';
+    sirenOsc.connect(sirenGain);
+    sirenOsc.start();
+
+    let rising = true;
+    let freq = 500;
+    sirenInterval = setInterval(() => {
+      if (rising) { freq += 60; if (freq >= 1200) rising = false; }
+      else { freq -= 60; if (freq <= 500) rising = true; }
+      if (sirenOsc) sirenOsc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      updateAudioWaitUI();
+    }, 40);
+
+    startTitleBlink();
+    updateAudioWaitUI();
+  }
+
+  function tryResumeAudio() {
+    // 자동재생 정책 때문에 mousemove 등으로는 재생이 안 될 수 있어
+    // 매번 진짜 사용자 이벤트가 들어올 때마다 재개를 시도한다.
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+    updateAudioWaitUI();
+  }
+
+  function updateAudioWaitUI() {
+    if (alarming && audioCtx && audioCtx.state === 'suspended') {
+      audioWait.classList.add('show');
+    } else {
+      audioWait.classList.remove('show');
+    }
+  }
+
+  function stopSiren() {
+    if (sirenInterval) { clearInterval(sirenInterval); sirenInterval = null; }
+    if (sirenOsc) { try { sirenOsc.stop(); } catch(e){} sirenOsc.disconnect(); sirenOsc = null; }
+    if (sirenGain) { sirenGain.disconnect(); sirenGain = null; }
+    stopTitleBlink();
+    updateAudioWaitUI();
+  }
+
+  function startTitleBlink() {
+    if (titleBlinkInterval) return;
+    let on = false;
+    titleBlinkInterval = setInterval(() => {
+      document.title = on ? ORIGINAL_TITLE : '🚨 침입 감지!!';
+      on = !on;
+    }, 800);
+  }
+  function stopTitleBlink() {
+    if (titleBlinkInterval) { clearInterval(titleBlinkInterval); titleBlinkInterval = null; }
+    document.title = ORIGINAL_TITLE;
+  }
+
+  // ---- 데스크톱 알림 ----
+  function updateNotifyBadge() {
+    if (notifPermission === 'granted') {
+      notifyBadge.textContent = '🔔 알림 켜짐';
+      notifyBadge.classList.add('on');
+    } else {
+      notifyBadge.textContent = '🔔 알림 끔';
+      notifyBadge.classList.remove('on');
+    }
+  }
+  function requestNotifyPermission() {
+    if (typeof Notification === 'undefined') return;
+    Notification.requestPermission().then(p => {
+      notifPermission = p;
+      updateNotifyBadge();
+    });
+  }
+  function sendDesktopNotification(body) {
+    if (notifPermission !== 'granted') return;
+    try { new Notification('🛡 보안 감시 시스템', { body, silent: false }); } catch (e) {}
+  }
+  notifyBadge.addEventListener('click', requestNotifyPermission);
+  updateNotifyBadge();
+
+  // ---- 카메라 미리보기 토글 (설정 확인용, 평소엔 꺼둠) ----
+  previewToggle.addEventListener('click', () => {
+    camPreviewWrap.classList.toggle('show');
+    previewToggle.classList.toggle('on');
+  });
+
+  function renderStatus() {
+    if (!armed) {
+      statusCard.classList.remove('alarm');
+      statusDot.classList.remove('alarm');
+      statusText.textContent = '감시 꺼짐';
+      bigMsg.classList.remove('show');
+      armToggleBtn.textContent = '감시 켜기';
+    } else if (alarming) {
+      statusCard.classList.add('alarm');
+      statusDot.classList.add('alarm');
+      statusText.textContent = '침입 감지됨!';
+      bigMsg.classList.add('show');
+      armToggleBtn.textContent = '감시 끄기 (비밀번호 필요)';
+    } else {
+      statusCard.classList.remove('alarm');
+      statusDot.classList.remove('alarm');
+      statusText.textContent = '감시중 (이상 없음)';
+      bigMsg.classList.remove('show');
+      armToggleBtn.textContent = '감시 끄기 (비밀번호 필요)';
+    }
+    updateAudioWaitUI();
+  }
+
+  function addShot(dataUrl, tag) {
+    if (!dataUrl) return; // 카메라 준비 안 됐을 때 빈 사진 저장 방지
+    shots.unshift({ img: dataUrl, time: new Date().toLocaleString('ko-KR'), tag: tag || '감지' });
+    if (shots.length > MAX_SHOTS) shots.length = MAX_SHOTS;
+    saveShots();
+  }
+
+  function triggerIntrusion(tag) {
+    if (!armed) return;
+    tryResumeAudio();
+    if (!alarming) {
+      alarming = true;
+      startSiren();
+      renderStatus();
+      sendDesktopNotification('침입이 감지되어 경보가 울리고 있습니다. (' + tag + ')');
+    }
+    const now = Date.now();
+    if (now - lastCaptureTime > CAPTURE_COOLDOWN_MS) {
+      lastCaptureTime = now;
+      addShot(capturePhoto(), tag);
+    }
+  }
+
+  function isInsideAdminUI(target) {
+    return overlay.contains(target) || adminToggle.contains(target) ||
+           notifyBadge.contains(target) || previewToggle.contains(target);
+  }
+
+  ['mousemove', 'mousedown', 'click', 'wheel'].forEach(evt => {
+    window.addEventListener(evt, (e) => {
+      if (isInsideAdminUI(e.target)) return;
+      triggerIntrusion('마우스');
+    }, { passive: true });
+  });
+  window.addEventListener('touchstart', (e) => {
+    if (isInsideAdminUI(e.target)) return;
+    triggerIntrusion('터치');
+  }, { passive: true });
+  window.addEventListener('keydown', (e) => {
+    if (isInsideAdminUI(e.target)) return;
+    triggerIntrusion('키보드');
+  }, { passive: true });
+
+  window.addEventListener('blur', () => {
+    if (!armed) return;
+    triggerIntrusion('화면 이탈(Alt+Tab 등)');
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!armed) return;
+    if (document.hidden) triggerIntrusion('탭 전환/최소화');
+  });
+
+  window.addEventListener('beforeunload', (e) => {
+    if (!armed) return;
+    addShot(capturePhoto(), '탭 닫기 시도'); // capturePhoto가 null이면 addShot이 무시함
+    e.preventDefault();
+    e.returnValue = '';
+  });
+
+  document.addEventListener('contextmenu', (e) => {
+    if (isInsideAdminUI(e.target)) return;
+    e.preventDefault();
+  });
+
+  // ---- 감시 켜기/끄기: 끄는 것은 반드시 비밀번호 필요 ----
+  armToggleBtn.addEventListener('click', () => {
+    if (!armed) {
+      armed = true;
+      renderStatus();
+    } else {
+      openAdminOverlay(); // 비밀번호 확인 후에만 실제로 꺼짐 (unlockAdmin에서 처리)
+    }
+  });
+
+  function openAdminOverlay() {
+    overlay.classList.add('show');
+    loginView.style.display = 'block';
+    galleryView.style.display = 'none';
+    pwInput.value = '';
+    pwError.textContent = '';
+    updateLockUI();
+    setTimeout(() => pwInput.focus(), 50);
+  }
+  function closeAdminOverlay() { overlay.classList.remove('show'); }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('show')) closeAdminOverlay();
+  });
+
+  function updateLockUI() {
+    const remain = lockUntil - Date.now();
+    if (remain > 0) {
+      pwInput.disabled = true;
+      pwSubmit.disabled = true;
+      pwError.textContent = '너무 많이 틀렸습니다. ' + Math.ceil(remain / 1000) + '초 후 다시 시도하세요.';
+      setTimeout(updateLockUI, 500);
+    } else {
+      pwInput.disabled = false;
+      pwSubmit.disabled = false;
+    }
+  }
+
+  function renderGallery() {
+    gallery.innerHTML = '';
+    if (shots.length === 0) { emptyNote.style.display = 'block'; return; }
+    emptyNote.style.display = 'none';
+    shots.forEach((shot, idx) => {
+      const fig = document.createElement('figure');
+      const img = document.createElement('img');
+      img.src = shot.img;
+      const t = document.createElement('div');
+      t.className = 'shot-time';
+      t.innerHTML = shot.time + '<br><span class="shot-tag">' + (shot.tag || '감지') + '</span>';
+      const dl = document.createElement('a');
+      dl.className = 'shot-dl';
+      dl.href = shot.img;
+      dl.download = 'intruder_' + idx + '.jpg';
+      dl.textContent = '⬇ 다운로드';
+      fig.appendChild(img);
+      fig.appendChild(t);
+      fig.appendChild(dl);
+      gallery.appendChild(fig);
+    });
+  }
+
+  function unlockAdmin() {
+    alarming = false;
+    armed = false; // 재무장 루프 방지: 관리자 인증 성공 시 감시를 확실히 끔 (다시 켤 땐 버튼으로)
+    stopSiren();
+    renderStatus();
+    failedAttempts = 0;
+    loginView.style.display = 'none';
+    galleryView.style.display = 'block';
+    renderGallery();
+  }
+
+  adminToggle.addEventListener('click', openAdminOverlay);
+  pwCancel.addEventListener('click', closeAdminOverlay);
+  closeAdminBtn.addEventListener('click', closeAdminOverlay);
+
+  pwSubmit.addEventListener('click', async () => {
+    if (Date.now() < lockUntil) return;
+    const hash = await sha256Hex(pwInput.value);
+    if (hash === ADMIN_PASSWORD_HASH) {
+      unlockAdmin();
+    } else {
+      failedAttempts++;
+      if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+        lockUntil = Date.now() + LOCKOUT_MS;
+        failedAttempts = 0;
+        updateLockUI();
+      } else {
+        pwError.textContent = '비밀번호가 올바르지 않습니다. (' + failedAttempts + '/' + MAX_FAILED_ATTEMPTS + ')';
+      }
+    }
+  });
+  pwInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') pwSubmit.click();
+  });
+
+  clearShotsBtn.addEventListener('click', () => {
+    shots = [];
+    saveShots();
+    renderGallery();
+  });
+
+  renderStatus();
+})();
+</script>
+
+</body>
+</html>
